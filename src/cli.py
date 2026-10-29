@@ -15,7 +15,8 @@ async def login(settings: Settings):
         await asyncio.to_thread(input, "When the project dashboard is visible, press Enter here: ")
         status = await bridge.call("status")
         if not status["authenticated"]:
-            raise BrowserError("Login was not confirmed. Run the login command again.")
+            reason = status.get("message") or "Login was not confirmed."
+            raise BrowserError(f"{reason} Run the login command again.")
         print(f"Login saved in {settings.profile_dir}")
     finally:
         await bridge.close()

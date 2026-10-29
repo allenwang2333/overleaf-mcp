@@ -99,15 +99,27 @@ export class OverleafBrowser {
   }
 
   async status() {
-    await this.goto('/project');
-    const url = new URL(this.page.url());
-    if (url.origin !== this.origin || url.pathname !== '/project') return {authenticated: false};
-    try {
-      const result = await this.json('/user/projects');
-      return {authenticated: Array.isArray(result.projects)};
-    } catch (error) {
-      if (error.safe) return {authenticated: false, message: error.message};
-      throw error;
+    for (let attempt = 0; attempt < 2; attempt++) {
+      try {
+        await this.dashboard();
+        const result = await this.json('/user/projects');
+        return {authenticated: Array.isArray(result.projects)};
+      } catch (error) {
+        // Login redirects can interrupt navigation or replace the JS context.
+        // Only this read-only check is retried; mutations are never replayed.
+        const navigating = /net::ERR_ABORTED|Execution context was destroyed|Cannot find context with specified id/
+          .test(error.message);
+        if (navigating && attempt === 0) {
+          await pause(250);
+          continue;
+        }
+        if (navigating) {
+          return {authenticated: false, message:
+            'Login check was interrupted by page navigation. Wait for the dashboard to finish loading.'};
+        }
+        if (error.safe) return {authenticated: false, message: error.message};
+        throw error;
+      }
     }
   }
 
